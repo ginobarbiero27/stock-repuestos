@@ -111,6 +111,12 @@
       <div class="card" style="padding:10px">
         <input type="text" id="buscador" placeholder="&#128269; Buscar por nombre o codigo..." oninput="loadStock()">
         <div class="filter-row" style="margin-top:8px;margin-bottom:0">
+          <select id="filtro-lugar" onchange="loadStock()">
+            <option value="">Todos los lugares</option>
+            <option>Garage</option><option>Deposito</option><option>Taller</option>
+          </select>
+        </div>
+        <div class="filter-row" style="margin-top:6px;margin-bottom:0">
           <select id="filtro-tipo" onchange="loadStock()">
             <option value="">Todos los tipos</option>
             <option>Motor</option><option>Frenos</option><option>Suspension</option>
@@ -146,6 +152,14 @@
         </select>
         <label>Se usa en</label>
         <input type="text" id="n-aplica" placeholder="Ej: AH710TK, AG949PU, Todos...">
+        <label>Lugar de almacenamiento</label>
+        <div class="radio-group">
+          <div class="radio-btn sel" id="lugar-garage" onclick="selLugar('Garage',this)">Garage</div>
+          <div class="radio-btn" id="lugar-deposito" onclick="selLugar('Deposito',this)">Deposito</div>
+          <div class="radio-btn" id="lugar-taller" onclick="selLugar('Taller',this)">Taller</div>
+        </div>
+        <label>Estanteria (opcional)</label>
+        <input type="text" id="n-estanteria" placeholder="Ej: Estanteria 1, Estanteria 2...">
         <label>Se usa como</label>
         <div class="radio-group">
           <div class="radio-btn sel" id="uso-unidad" onclick="selUso('unidad',this)">Unidad (1 por vez)</div>
@@ -212,7 +226,7 @@ const SUPA_URL="https://fihtrrprqaerlonbkqzy.supabase.co";
 const SUPA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpaHRycnBycWFlcmxvbmJrcXp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwODY0NzgsImV4cCI6MjA5MjY2MjQ3OH0.BJEkQ71GYVLtYG3KsTUmK_-6TGGBpOIbBUY1t1JiaOI";
 const sb=supabase.createClient(SUPA_URL,SUPA_KEY);
 
-let currentUser=null, usoTipo="unidad", medTipo="unidades", modalItem=null, modalAccion=null;
+let currentUser=null, usoTipo="unidad", medTipo="unidades", lugarTipo="Garage", modalItem=null, modalAccion=null;
 
 document.getElementById("header-fecha").textContent=new Date().toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"});
 function showLoading(v){document.getElementById("loading").style.display=v?"flex":"none";}
@@ -254,6 +268,7 @@ function showScreen(name,el){
 // SELECTORS
 function selUso(v,el){usoTipo=v;document.querySelectorAll("#uso-unidad,#uso-par,#uso-juego").forEach(b=>b.className="radio-btn");el.className="radio-btn sel";}
 function selMed(v,el){medTipo=v;document.querySelectorAll("#med-unid,#med-lts,#med-kg").forEach(b=>b.className="radio-btn");el.className="radio-btn sel";}
+function selLugar(v,el){lugarTipo=v;document.querySelectorAll("#lugar-garage,#lugar-deposito,#lugar-taller").forEach(b=>b.className="radio-btn");el.className="radio-btn sel";}
 
 // CARGAR MARCAS PARA FILTRO
 async function loadMarcasFilter(){
@@ -275,9 +290,11 @@ async function loadStock(){
   const buscar=document.getElementById("buscador").value.trim();
   const tipo=document.getElementById("filtro-tipo").value;
   const marca=document.getElementById("filtro-marca").value;
+  const lugar=document.getElementById("filtro-lugar").value;
   if(buscar) query=query.or("nombre.ilike.%"+buscar+"%,codigo.ilike.%"+buscar+"%");
   if(tipo) query=query.eq("tipo",tipo);
   if(marca) query=query.eq("marca",marca);
+  if(lugar) query=query.eq("lugar",lugar);
   const {data}=await query;
   showLoading(false);
 
@@ -310,6 +327,7 @@ async function loadStock(){
             (r.marca?"<span class='badge badge-blue'>"+r.marca+"</span>":"")+
           "</div>"+
           (r.aplica?"<div style='font-size:11px;color:#888;margin-top:3px'>Aplica: "+r.aplica+"</div>":"")+
+          (r.lugar?"<div style='font-size:11px;color:#C55A11;margin-top:2px;font-weight:600'>📍 "+r.lugar+(r.estanteria?" / "+r.estanteria:"")+"</div>":"")+
         "</div>"+
         "<div style='text-align:right'>"+
           "<div class='item-cant "+cantCls+"'>"+r.cantidad+"</div>"+
@@ -348,6 +366,9 @@ function abrirEditar(item){
     "<label>Marca</label><input type='text' id='edit-marca' value='"+(item.marca||"")+"'>"+
     "<label>Aplica en</label><input type='text' id='edit-aplica' value='"+(item.aplica||"")+"'>"+
     "<label>Umbral de alerta</label><input type='number' id='edit-umbral' value='"+(item.umbral_alerta||1)+"' inputmode='numeric'>"+
+    "<label>Lugar</label>"+
+    "<select id='edit-lugar'><option value=''>- Seleccionar -</option><option"+(item.lugar==='Garage'?" selected":"")+">Garage</option><option"+(item.lugar==='Deposito'?" selected":"")+">Deposito</option><option"+(item.lugar==='Taller'?" selected":"")+">Taller</option></select>"+
+    "<label>Estanteria</label><input type='text' id='edit-estanteria' value='"+(item.estanteria||"")+"' placeholder='Ej: Estanteria 1'>"+
     "<label>Notas</label><input type='text' id='edit-notas' value='"+(item.notas||"")+"'>";
   document.getElementById("modal-editar").classList.add("open");
 }
@@ -376,6 +397,8 @@ async function guardarModal(){
       aplica:document.getElementById("edit-aplica").value.trim(),
       umbral_alerta:parseFloat(document.getElementById("edit-umbral").value)||1,
       notas:document.getElementById("edit-notas").value.trim(),
+      lugar:document.getElementById("edit-lugar").value,
+      estanteria:document.getElementById("edit-estanteria").value.trim(),
     }).eq("id",modalItem.id);
     loadMarcasFilter();
   }
@@ -396,13 +419,15 @@ async function guardarRepuesto(){
   const notas=document.getElementById("n-notas").value.trim();
   if(!nombre){alert("Ingresa el nombre del repuesto");return;}
   showLoading(true);
+  const estanteria=document.getElementById("n-estanteria").value.trim();
   const {error}=await sb.from("stock_repuestos").insert([{
     nombre,codigo,marca,tipo,aplica,cantidad,medida:medTipo,
-    uso_tipo:usoTipo,umbral_alerta:umbral,notas,usuario:currentUser
+    uso_tipo:usoTipo,umbral_alerta:umbral,notas,usuario:currentUser,
+    lugar:lugarTipo,estanteria:estanteria
   }]);
   showLoading(false);
   if(error){alert("Error: "+error.message);return;}
-  ["n-nombre","n-codigo","n-marca","n-aplica","n-cantidad","n-notas"].forEach(id=>document.getElementById(id).value="");
+  ["n-nombre","n-codigo","n-marca","n-aplica","n-cantidad","n-notas","n-estanteria"].forEach(id=>document.getElementById(id).value="");
   document.getElementById("n-umbral").value="1";
   document.getElementById("n-tipo").value="";
   loadMarcasFilter();
@@ -447,10 +472,10 @@ async function exportarExcel(){
   const {data}=await sb.from("stock_repuestos").select("*").order("nombre");
   showLoading(false);
   if(!data||!data.length){alert("Sin datos para exportar");return;}
-  const rows=data.map(r=>[r.codigo||"",r.nombre,r.marca||"",r.tipo||"",r.aplica||"",r.cantidad,r.medida,r.uso_tipo,r.umbral_alerta,r.notas||""]);
+  const rows=data.map(r=>[r.codigo||"",r.nombre,r.marca||"",r.tipo||"",r.aplica||"",r.cantidad,r.medida,r.uso_tipo,r.umbral_alerta,r.lugar||"",r.estanteria||"",r.notas||""]);
   const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet([["CODIGO","NOMBRE","MARCA","TIPO","APLICA EN","CANTIDAD","MEDIDA","USO","UMBRAL ALERTA","NOTAS"],...rows]);
-  ws["!cols"]=[{wch:10},{wch:30},{wch:14},{wch:14},{wch:20},{wch:10},{wch:10},{wch:10},{wch:14},{wch:25}];
+  const ws=XLSX.utils.aoa_to_sheet([["CODIGO","NOMBRE","MARCA","TIPO","APLICA EN","CANTIDAD","MEDIDA","USO","UMBRAL ALERTA","LUGAR","ESTANTERIA","NOTAS"],...rows]);
+  ws["!cols"]=[{wch:10},{wch:30},{wch:14},{wch:14},{wch:20},{wch:10},{wch:10},{wch:10},{wch:14},{wch:12},{wch:14},{wch:25}];
   XLSX.utils.book_append_sheet(wb,ws,"Stock Repuestos");
   XLSX.writeFile(wb,"stock_repuestos_"+new Date().toISOString().split("T")[0]+".xlsx");
 }
