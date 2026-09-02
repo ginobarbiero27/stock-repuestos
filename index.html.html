@@ -371,6 +371,7 @@ async function loadStock(){
         "<button class='btn-sm btn-sm-sub' onclick='abrirMovimiento("+JSON.stringify(r).replace(/'/g,"&#39;")+",\"salida\")'>- Salida</button>"+
         "<button class='btn-sm' style='background:#EDE9FE;color:#6D28D9' onclick='abrirTransferir("+JSON.stringify(r).replace(/'/g,"&#39;")+")'>⇄ Transferir</button>"+
         "<button class='btn-sm btn-sm-edit' onclick='abrirEditar("+JSON.stringify(r).replace(/'/g,"&#39;")+")'>Editar</button>"+
+        "<button class='btn-sm btn-sm-del' onclick='borrarRepuesto("+r.id+")'">Borrar</button>"+
       "</div>"+
     "</div>";
   }).join("");
@@ -631,6 +632,16 @@ async function ejecutarTransferir(){
   loadStock();
   loadMarcasFilter();
   alert("Transferencia realizada: " + cant + " unidades de " + desde + " → " + hacia);
+}
+
+async function borrarRepuesto(id){
+  if(!confirm("Seguro que queres eliminar este repuesto? Esta accion no se puede deshacer.")) return;
+  showLoading(true);
+  const {error} = await sb.from("stock_repuestos").delete().eq("id", id);
+  showLoading(false);
+  if(error){alert("Error: "+error.message);return;}
+  loadStock();
+  loadMarcasFilter();
 }
 
 async function exportarMovimientos(){
