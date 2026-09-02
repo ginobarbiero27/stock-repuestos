@@ -549,11 +549,22 @@ async function ejecutarTransferir(){
 
   showLoading(true);
 
-  // Buscar si ya existe el repuesto en el lugar destino
-  const {data: destExist} = await sb.from("stock_repuestos").select("*")
-    .ilike("nombre", itemTransfiriendo.nombre)
-    .eq("lugar", hacia)
-    .limit(1);
+  // Buscar si ya existe el repuesto en el lugar destino — primero por codigo, luego por nombre
+  let destExist = null;
+  if(itemTransfiriendo.codigo){
+    const {data: byCode} = await sb.from("stock_repuestos").select("*")
+      .ilike("codigo", itemTransfiriendo.codigo)
+      .eq("lugar", hacia)
+      .limit(1);
+    if(byCode && byCode.length > 0) destExist = byCode;
+  }
+  if(!destExist || destExist.length === 0){
+    const {data: byName} = await sb.from("stock_repuestos").select("*")
+      .ilike("nombre", itemTransfiriendo.nombre)
+      .eq("lugar", hacia)
+      .limit(1);
+    if(byName && byName.length > 0) destExist = byName;
+  }
 
   // Descontar del origen
   const nuevaCantOrigen = Math.max(0, itemTransfiriendo.cantidad - cant);
