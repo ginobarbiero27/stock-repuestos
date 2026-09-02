@@ -217,6 +217,37 @@
   </div>
 </div>
 
+<!-- MODAL TRANSFERIR -->
+<div class="modal" id="modal-transferir">
+  <div class="modal-card">
+    <div class="modal-title" id="modal-transf-titulo">Transferir repuesto</div>
+    <div id="modal-transf-contenido">
+      <label style="font-size:13px;color:#555;display:block;margin-bottom:4px;font-weight:500">Desde</label>
+      <select id="transf-desde" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:8px">
+        <option value="Garage">Garage</option>
+        <option value="Deposito">Deposito</option>
+        <option value="Taller">Taller</option>
+      </select>
+      <label style="font-size:13px;color:#555;display:block;margin-bottom:4px;font-weight:500">Hacia</label>
+      <select id="transf-hacia" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:8px">
+        <option value="Taller">Taller</option>
+        <option value="Deposito">Deposito</option>
+        <option value="Garage">Garage</option>
+      </select>
+      <label style="font-size:13px;color:#555;display:block;margin-bottom:4px;font-weight:500">Cantidad a transferir</label>
+      <input type="number" id="transf-cant" placeholder="Ej: 2" inputmode="numeric" min="1"
+        style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:8px">
+      <label style="font-size:13px;color:#555;display:block;margin-bottom:4px;font-weight:500">Motivo (opcional)</label>
+      <input type="text" id="transf-motivo" placeholder="Ej: Para reparacion AH710TK"
+        style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn-secondary" style="margin-top:0" onclick="cerrarTransferir()">Cancelar</button>
+      <button style="flex:1;padding:10px;background:#6D28D9;color:white;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:0" onclick="ejecutarTransferir()">Transferir</button>
+    </div>
+  </div>
+</div>
+
 <div class="loading-overlay" id="loading" style="display:none"><div class="spinner"></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -478,6 +509,116 @@ async function exportarExcel(){
   ws["!cols"]=[{wch:10},{wch:30},{wch:14},{wch:14},{wch:20},{wch:10},{wch:10},{wch:10},{wch:14},{wch:12},{wch:14},{wch:25}];
   XLSX.utils.book_append_sheet(wb,ws,"Stock Repuestos");
   XLSX.writeFile(wb,"stock_repuestos_"+new Date().toISOString().split("T")[0]+".xlsx");
+}
+
+let itemTransfiriendo = null;
+
+function abrirTransferir(item){
+  itemTransfiriendo = item;
+  document.getElementById("modal-transf-titulo").textContent = "Transferir — " + item.nombre;
+  // Pre-seleccionar el lugar actual del repuesto
+  const desde = document.getElementById("transf-desde");
+  const hacia = document.getElementById("transf-hacia");
+  if(item.lugar){
+    desde.value = item.lugar;
+    // Seleccionar otro lugar por defecto
+    const otros = ["Garage","Deposito","Taller"].filter(l => l !== item.lugar);
+    hacia.value = otros[0];
+  }
+  document.getElementById("transf-cant").value = "";
+  document.getElementById("transf-motivo").value = "";
+  document.getElementById("modal-transferir").classList.add("open");
+}
+
+function cerrarTransferir(){
+  document.getElementById("modal-transferir").classList.remove("open");
+  itemTransfiriendo = null;
+}
+
+async function ejecutarTransferir(){
+  if(!itemTransfiriendo) return;
+  const desde = document.getElementById("transf-desde").value;
+  const hacia = document.getElementById("transf-hacia").value;
+  const cant = parseFloat(document.getElementById("transf-cant").value)||0;
+  const motivo = document.getElementById("transf-motivo").value.trim();
+
+  if(desde === hacia){ alert("El origen y destino no pueden ser iguales"); return; }
+  if(!cant || cant <= 0){ alert("Ingresa la cantidad"); return; }
+  if(cant > itemTransfiriendo.cantidad){ alert("No hay suficiente stock en " + desde + " (stock actual: " + itemTransfiriendo.cantidad + ")"); return; }
+
+  showLoading(true);
+
+  // Buscar si ya existe el repuesto en el lugar destino
+  const {data: destExist} = await sb.from("stock_repuestos").select("*")
+    .ilike("nombre", itemTransfiriendo.nombre)
+    .eq("lugar", hacia)
+    .limit(1);
+
+  // Descontar del origen
+  const nuevaCantOrigen = Math.max(0, itemTransfiriendo.cantidad - cant);
+  await sb.from("stock_repuestos").update({cantidad: nuevaCantOrigen}).eq("id", itemTransfiriendo.id);
+
+  // Registrar salida del origen
+  await sb.from("movimientos_stock").insert([{
+    repuesto_id: itemTransfiriendo.id,
+    repuesto_nombre: itemTransfiriendo.nombre,
+    tipo: "salida",
+    cantidad: cant,
+    motivo: "Transferencia a " + hacia + (motivo ? " — " + motivo : ""),
+    usuario: currentUser,
+    stock_anterior: itemTransfiriendo.cantidad,
+    stock_nuevo: nuevaCantOrigen
+  }]);
+
+  if(destExist && destExist.length > 0){
+    // Sumar al destino existente
+    const nuevaCantDest = destExist[0].cantidad + cant;
+    await sb.from("stock_repuestos").update({cantidad: nuevaCantDest}).eq("id", destExist[0].id);
+    await sb.from("movimientos_stock").insert([{
+      repuesto_id: destExist[0].id,
+      repuesto_nombre: destExist[0].nombre,
+      tipo: "entrada",
+      cantidad: cant,
+      motivo: "Transferencia desde " + desde + (motivo ? " — " + motivo : ""),
+      usuario: currentUser,
+      stock_anterior: destExist[0].cantidad,
+      stock_nuevo: nuevaCantDest
+    }]);
+  } else {
+    // Crear nuevo registro en el destino
+    const {data: nuevo} = await sb.from("stock_repuestos").insert([{
+      nombre: itemTransfiriendo.nombre,
+      codigo: itemTransfiriendo.codigo,
+      marca: itemTransfiriendo.marca,
+      tipo: itemTransfiriendo.tipo,
+      aplica: itemTransfiriendo.aplica,
+      cantidad: cant,
+      medida: itemTransfiriendo.medida,
+      uso_tipo: itemTransfiriendo.uso_tipo,
+      umbral_alerta: itemTransfiriendo.umbral_alerta,
+      lugar: hacia,
+      estanteria: "",
+      usuario: currentUser
+    }]).select().single();
+    if(nuevo){
+      await sb.from("movimientos_stock").insert([{
+        repuesto_id: nuevo.id,
+        repuesto_nombre: nuevo.nombre,
+        tipo: "entrada",
+        cantidad: cant,
+        motivo: "Transferencia desde " + desde + (motivo ? " — " + motivo : ""),
+        usuario: currentUser,
+        stock_anterior: 0,
+        stock_nuevo: cant
+      }]);
+    }
+  }
+
+  showLoading(false);
+  cerrarTransferir();
+  loadStock();
+  loadMarcasFilter();
+  alert("Transferencia realizada: " + cant + " unidades de " + desde + " → " + hacia);
 }
 
 async function exportarMovimientos(){
