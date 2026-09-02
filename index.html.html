@@ -371,7 +371,7 @@ async function loadStock(){
         "<button class='btn-sm btn-sm-sub' onclick='abrirMovimiento("+JSON.stringify(r).replace(/'/g,"&#39;")+",\"salida\")'>- Salida</button>"+
         "<button class='btn-sm' style='background:#EDE9FE;color:#6D28D9' onclick='abrirTransferir("+JSON.stringify(r).replace(/'/g,"&#39;")+")'>⇄ Transferir</button>"+
         "<button class='btn-sm btn-sm-edit' onclick='abrirEditar("+JSON.stringify(r).replace(/'/g,"&#39;")+")'>Editar</button>"+
-        "<button class='btn-sm btn-sm-del' onclick='borrarRepuesto("+r.id+")'">Borrar</button>"+
+        "<button class='btn-sm btn-sm-del' onclick='borrarRepuesto("+r.id+")'>Borrar</button>"+
       "</div>"+
     "</div>";
   }).join("");
