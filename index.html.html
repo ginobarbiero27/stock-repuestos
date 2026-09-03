@@ -333,7 +333,7 @@ async function loadStock(){
   if(!data||!data.length){div.innerHTML="<div class='empty-msg'>Sin repuestos. Agrega el primero en la pestana Agregar.</div>";return;}
 
   // Check alertas
-  const alertas=data.filter(r=>(r.umbral_alerta||0)>0 && r.cantidad<=(r.umbral_alerta||0));
+  const alertas=data.filter(r=>r.umbral_alerta===0?r.cantidad<=0:(r.umbral_alerta||0)>0 && r.cantidad<=(r.umbral_alerta||0));
   const bannerDiv=document.getElementById("alerta-banner");
   if(alertas.length>0){
     bannerDiv.style.display="block";
@@ -343,7 +343,7 @@ async function loadStock(){
   }
 
   div.innerHTML=data.map(r=>{
-    const alerta=(r.umbral_alerta||0)>0 && r.cantidad<=(r.umbral_alerta||0);
+    const alerta=r.umbral_alerta===0?r.cantidad<=0:(r.umbral_alerta||0)>0 && r.cantidad<=(r.umbral_alerta||0);
     const bajo=(r.umbral_alerta||0)>0 && r.cantidad<=(r.umbral_alerta||0)*2 && !alerta;
     const cls=alerta?"alerta-roja":bajo?"alerta-naranja":"ok";
     const cantCls=alerta?"rojo":bajo?"naranja":"verde";
