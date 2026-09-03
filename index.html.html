@@ -175,7 +175,7 @@
           <div class="radio-btn" id="med-kg" onclick="selMed('kg',this)">Kg</div>
         </div>
         <label>Umbral de alerta (cantidad minima)</label>
-        <input type="number" id="n-umbral" placeholder="Ej: 1" inputmode="numeric" min="0" value="1">
+        <input type="number" id="n-umbral" placeholder="Ej: 1" inputmode="numeric" min="0" value="1" min="0">
         <label>Notas (opcional)</label>
         <input type="text" id="n-notas" placeholder="Ej: Para cambio cada 30.000 km">
         <button class="btn-primary" onclick="guardarRepuesto()">Guardar repuesto</button>
@@ -428,7 +428,7 @@ async function guardarModal(){
       codigo:document.getElementById("edit-codigo").value.trim().toUpperCase(),
       marca:document.getElementById("edit-marca").value.trim(),
       aplica:document.getElementById("edit-aplica").value.trim(),
-      umbral_alerta:parseFloat(document.getElementById("edit-umbral").value)||1,
+      umbral_alerta:parseFloat(document.getElementById("edit-umbral").value)??1,
       notas:document.getElementById("edit-notas").value.trim(),
       lugar:document.getElementById("edit-lugar").value,
       estanteria:document.getElementById("edit-estanteria").value.trim(),
@@ -448,7 +448,8 @@ async function guardarRepuesto(){
   const tipo=document.getElementById("n-tipo").value;
   const aplica=document.getElementById("n-aplica").value.trim();
   const cantidad=parseFloat(document.getElementById("n-cantidad").value)||0;
-  const umbral=parseFloat(document.getElementById("n-umbral").value)||1;
+  const umbralVal=document.getElementById("n-umbral").value;
+  const umbral=umbralVal!==""?parseFloat(umbralVal):1;
   const notas=document.getElementById("n-notas").value.trim();
   if(!nombre){alert("Ingresa el nombre del repuesto");return;}
   showLoading(true);
